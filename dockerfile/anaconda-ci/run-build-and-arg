@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eux
+
+# Avoid clobbering the host's checkout, so work from a copy
+# Also don't copy bots, it breaks things and is useless
+rsync -a /anaconda /tmp/ --exclude ui/webui/bots
+cd /tmp/anaconda
+rm -rf test-logs
+
+./autogen.sh
+# Enable us to change autotools configuration by ENV var.
+./configure ${CONFIGURE_ARGS:-}
+
+# always copy the results back to the host
+copy_logs() {
+    mkdir -p /anaconda/test-logs/
+    # clean up from previous run
+    rm -rf /anaconda/test-logs/*
+    # copy logs and coverage reports
+    find \( -name '*.log' -o -name 'coverage*.xml' \) -exec cp '{}' /anaconda/test-logs/ \;
+}
+trap copy_logs EXIT INT QUIT PIPE
+
+# run user-supplied command (by default, `make ci`)
+# shellcheck disable=SC2068
+$@
